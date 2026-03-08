@@ -1,7 +1,27 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 
 const app = express();
 const PORT = 8080;
+
+const middlewareLogResponses = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  res.on("finish", () => {
+    const statusCode = res.statusCode;
+
+    if (statusCode !== 200) {
+      console.log(
+        `[NON-OK] ${req.method} ${req.url} - Status: ${statusCode}`
+      );
+    }
+  });
+
+  next();
+};
+
+app.use(middlewareLogResponses);
 
 app.use("/app", express.static("./src/app"));
 
