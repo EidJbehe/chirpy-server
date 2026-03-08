@@ -1,5 +1,4 @@
 import express, { Request, Response, NextFunction } from "express";
-import path from "path";
 import { config } from "./config.js";
 
 const app = express();
@@ -57,11 +56,7 @@ const handlerReset = (_req: Request, res: Response): void => {
 
 app.use(middlewareLogResponses);
 
-app.get("/app", middlewareMetricsInc, (_req: Request, res: Response) => {
-  res.sendFile(path.resolve("src/app/index.html"));
-});
-
-app.use("/app", middlewareMetricsInc, express.static(path.resolve("src/app")));
+app.use("/app", middlewareMetricsInc, express.static("./src/app"));
 
 app.get("/api/healthz", handlerReadiness);
 app.get("/admin/metrics", handlerMetrics);
