@@ -8,6 +8,13 @@
       "when": 1772982962583,
       "tag": "0000_hot_chronomancer",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773005694356,
+      "tag": "0001_nostalgic_marvel_boy",
+      "breakpoints": true
     }
   ]
 }

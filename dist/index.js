@@ -1,8 +1,20 @@
 import express from "express";
 import { config } from "./config.js";
+import postgres from "postgres";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { createUser, deleteAllUsers } from "./db/queries/users.js";
+import { createChirp } from "./db/queries/chirps.js";
+const migrationClient = postgres(config.db.url, { max: 1 });
+await migrate(drizzle(migrationClient), config.db.migrationConfig);
 const app = express();
 const PORT = 8080;
 app.use(express.json());
+/*
+========================
+Custom Errors
+========================
+*/
 class BadRequestError extends Error {
     constructor(message) {
         super(message);
@@ -23,91 +35,110 @@ class NotFoundError extends Error {
         super(message);
     }
 }
-const middlewareLogResponses = (req, res, next) => {
-    res.on("finish", () => {
-        const statusCode = res.statusCode;
-        if (statusCode !== 200) {
-            console.log(`[NON-OK] ${req.method} ${req.url} - Status: ${statusCode}`);
-        }
-    });
+/*
+========================
+Metrics Middleware
+========================
+*/
+app.use("/app", (req, res, next) => {
+    config.api.fileserverHits++;
     next();
-};
-const middlewareMetricsInc = (req, res, next) => {
-    config.api.fileserverHits += 1;
-    next();
-};
-const handlerReadiness = (_req, res) => {
-    res.set("Content-Type", "text/plain; charset=utf-8");
-    res.send("OK");
-};
-const handlerMetrics = (_req, res) => {
-    res.set("Content-Type", "text/html; charset=utf-8");
-    res.send(`
-<html>
-  <body>
-    <h1>Welcome, Chirpy Admin</h1>
-    <p>Chirpy has been visited ${config.api.fileserverHits} times!</p>
-  </body>
-</html>
-`);
-};
-const handlerReset = (_req, res) => {
-    config.api.fileserverHits = 0;
-    res.set("Content-Type", "text/plain; charset=utf-8");
-    res.send("Hits reset to 0");
-};
-const handlerValidateChirp = async (req, res) => {
-    const params = req.body;
-    if (!params.body) {
-        throw new BadRequestError("Something went wrong");
-    }
-    if (params.body.length > 140) {
-        throw new BadRequestError("Chirp is too long. Max length is 140");
-    }
-    const profaneWords = ["kerfuffle", "sharbert", "fornax"];
-    const words = params.body.split(" ");
-    const cleanedWords = words.map((word) => {
-        if (profaneWords.includes(word.toLowerCase())) {
-            return "****";
-        }
-        return word;
-    });
-    const cleanedBody = cleanedWords.join(" ");
-    res.status(200).json({
-        cleanedBody: cleanedBody,
-    });
-};
-app.use(middlewareLogResponses);
-app.use("/app", middlewareMetricsInc, express.static("./src/app"));
-app.get("/api/healthz", handlerReadiness);
-app.post("/api/validate_chirp", (req, res, next) => {
-    Promise.resolve(handlerValidateChirp(req, res)).catch(next);
 });
-app.get("/admin/metrics", handlerMetrics);
-app.post("/admin/reset", handlerReset);
-const errorHandler = (err, req, res, next) => {
+/*
+========================
+Metrics Endpoint
+========================
+*/
+app.get("/admin/metrics", (req, res) => {
+    res.set("Content-Type", "text/html");
+    res.status(200).send(`
+    <html>
+      <body>
+        <h1>Welcome, Chirpy Admin</h1>
+        <p>Chirpy has been visited ${config.api.fileserverHits} times!</p>
+      </body>
+    </html>
+  `);
+});
+/*
+========================
+Reset Endpoint
+========================
+*/
+app.post("/admin/reset", async (req, res) => {
+    if (config.api.platform !== "dev") {
+        res.sendStatus(403);
+        return;
+    }
+    config.api.fileserverHits = 0;
+    await deleteAllUsers();
+    res.sendStatus(200);
+});
+/*
+========================
+Create User Endpoint
+========================
+*/
+app.post("/api/users", async (req, res) => {
+    const params = req.body;
+    const user = await createUser({
+        email: params.email,
+    });
+    res.status(201).json(user);
+});
+/*
+========================
+Error Handler
+========================
+*/
+function errorHandler(err, req, res, next) {
     if (err instanceof BadRequestError) {
-        res.status(400).json({ error: err.message });
+        res.status(400).send(err.message);
         return;
     }
     if (err instanceof UnauthorizedError) {
-        res.status(401).json({ error: err.message });
+        res.status(401).send(err.message);
         return;
     }
     if (err instanceof ForbiddenError) {
-        res.status(403).json({ error: err.message });
+        res.status(403).send(err.message);
         return;
     }
     if (err instanceof NotFoundError) {
-        res.status(404).json({ error: err.message });
+        res.status(404).send(err.message);
         return;
     }
-    console.log(err);
-    res.status(500).json({
-        error: "Internal Server Error",
-    });
-};
+    console.error(err);
+    res.status(500).send("Internal Server Error");
+}
+app.post("/api/chirps", async (req, res, next) => {
+    try {
+        const params = req.body;
+        if (params.body.length > 140) {
+            throw new BadRequestError("Chirp is too long");
+        }
+        const badWords = ["kerfuffle", "sharbert", "fornax"];
+        let cleanedBody = params.body;
+        for (const word of badWords) {
+            const regex = new RegExp(word, "gi");
+            cleanedBody = cleanedBody.replace(regex, "****");
+        }
+        const chirp = await createChirp({
+            body: cleanedBody,
+            userId: params.userId,
+        });
+        res.status(201).json(chirp);
+    }
+    catch (err) {
+        next(err);
+    }
+});
 app.use(errorHandler);
+/*
+========================
+Start Server
+========================
+*/
 app.listen(PORT, () => {
     console.log(`Server is running at http://localhost:${PORT}`);
 });
