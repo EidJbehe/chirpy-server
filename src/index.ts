@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
+import path from "path";
 import { config } from "./config.js";
 
 const app = express();
@@ -31,14 +32,13 @@ const middlewareMetricsInc = (
   next();
 };
 
-const handlerReadiness = (req: Request, res: Response): void => {
+const handlerReadiness = (_req: Request, res: Response): void => {
   res.set("Content-Type", "text/plain; charset=utf-8");
   res.send("OK");
 };
 
-const handlerMetrics = (req: Request, res: Response): void => {
+const handlerMetrics = (_req: Request, res: Response): void => {
   res.set("Content-Type", "text/html; charset=utf-8");
-
   res.send(`
 <html>
   <body>
@@ -48,7 +48,8 @@ const handlerMetrics = (req: Request, res: Response): void => {
 </html>
 `);
 };
-const handlerReset = (req: Request, res: Response): void => {
+
+const handlerReset = (_req: Request, res: Response): void => {
   config.fileserverHits = 0;
   res.set("Content-Type", "text/plain; charset=utf-8");
   res.send("Hits reset to 0");
@@ -56,11 +57,16 @@ const handlerReset = (req: Request, res: Response): void => {
 
 app.use(middlewareLogResponses);
 
+app.get("/app", middlewareMetricsInc, (_req: Request, res: Response) => {
+  res.sendFile(path.resolve("src/app/index.html"));
+});
+
+app.use("/app", middlewareMetricsInc, express.static(path.resolve("src/app")));
+
 app.get("/api/healthz", handlerReadiness);
-
 app.get("/admin/metrics", handlerMetrics);
-
 app.get("/admin/reset", handlerReset);
+
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
 });
