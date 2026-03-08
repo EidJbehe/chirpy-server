@@ -4,7 +4,7 @@ import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { createUser, deleteAllUsers } from "./db/queries/users.js";
-import { createChirp } from "./db/queries/chirps.js";
+import { createChirp, getAllChirps } from "./db/queries/chirps.js";
 const migrationClient = postgres(config.db.url, { max: 1 });
 await migrate(drizzle(migrationClient), config.db.migrationConfig);
 
@@ -145,6 +145,14 @@ function errorHandler(
   console.error(err);
   res.status(500).send("Internal Server Error");
 }
+app.get("/api/chirps", async (req, res, next) => {
+  try {
+    const chirps = await getAllChirps();
+    res.status(200).json(chirps);
+  } catch (err) {
+    next(err);
+  }
+});
 app.post("/api/chirps", async (req, res, next) => {
   try {
     type parameters = {
