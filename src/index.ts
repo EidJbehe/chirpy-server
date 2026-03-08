@@ -60,22 +60,23 @@ const handlerValidateChirp = (req: Request, res: Response): void => {
 
   const params: RequestBody = req.body;
 
-  if (params.body.length > 140) {
-    res.set("Content-Type", "application/json");
-    res.status(400).send(
-      JSON.stringify({
-        error: "Chirp is too long",
-      })
-    );
+  if (!params.body) {
+    res.status(400).json({
+      error: "Something went wrong",
+    });
     return;
   }
 
-  res.set("Content-Type", "application/json");
-  res.status(200).send(
-    JSON.stringify({
-      valid: true,
-    })
-  );
+  if (params.body.length > 140) {
+    res.status(400).json({
+      error: "Chirp is too long",
+    });
+    return;
+  }
+
+  res.status(200).json({
+    valid: true,
+  });
 };
 app.use(middlewareLogResponses);
 
