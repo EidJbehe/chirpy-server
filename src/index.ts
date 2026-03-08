@@ -1,6 +1,8 @@
 import express, { Request, Response, NextFunction } from "express";
 import { config } from "./config.js";
-
+import postgres from "postgres";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { drizzle } from "drizzle-orm/postgres-js";
 const app = express();
 const PORT = 8080;
 
@@ -53,7 +55,7 @@ const middlewareMetricsInc = (
   res: Response,
   next: NextFunction
 ): void => {
-  config.fileserverHits += 1;
+  config.api.fileserverHits += 1;
   next();
 };
 
@@ -68,14 +70,14 @@ const handlerMetrics = (_req: Request, res: Response): void => {
 <html>
   <body>
     <h1>Welcome, Chirpy Admin</h1>
-    <p>Chirpy has been visited ${config.fileserverHits} times!</p>
+    <p>Chirpy has been visited ${config.api.fileserverHits} times!</p>
   </body>
 </html>
 `);
 };
 
 const handlerReset = (_req: Request, res: Response): void => {
-  config.fileserverHits = 0;
+  config.api.fileserverHits = 0;
   res.set("Content-Type", "text/plain; charset=utf-8");
   res.send("Hits reset to 0");
 };

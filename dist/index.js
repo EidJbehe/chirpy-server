@@ -33,7 +33,7 @@ const middlewareLogResponses = (req, res, next) => {
     next();
 };
 const middlewareMetricsInc = (req, res, next) => {
-    config.fileserverHits += 1;
+    config.api.fileserverHits += 1;
     next();
 };
 const handlerReadiness = (_req, res) => {
@@ -46,13 +46,13 @@ const handlerMetrics = (_req, res) => {
 <html>
   <body>
     <h1>Welcome, Chirpy Admin</h1>
-    <p>Chirpy has been visited ${config.fileserverHits} times!</p>
+    <p>Chirpy has been visited ${config.api.fileserverHits} times!</p>
   </body>
 </html>
 `);
 };
 const handlerReset = (_req, res) => {
-    config.fileserverHits = 0;
+    config.api.fileserverHits = 0;
     res.set("Content-Type", "text/plain; charset=utf-8");
     res.send("Hits reset to 0");
 };
