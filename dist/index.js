@@ -30,9 +30,9 @@ const handlerReset = (req, res) => {
 };
 app.use(middlewareLogResponses);
 app.use("/app", middlewareMetricsInc, express.static("./src/app"));
-app.get("/healthz", handlerReadiness);
-app.get("/metrics", handlerMetrics);
-app.get("/reset", handlerReset);
+app.get("/api/healthz", handlerReadiness);
+app.get("/api/metrics", handlerMetrics);
+app.get("/api/reset", handlerReset);
 app.listen(PORT, () => {
     console.log(`Server is running at http://localhost:${PORT}`);
 });
