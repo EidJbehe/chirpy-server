@@ -53,7 +53,7 @@ const handlerReset = (_req: Request, res: Response): void => {
   res.set("Content-Type", "text/plain; charset=utf-8");
   res.send("Hits reset to 0");
 };
-const handlerValidateChirp = (req: Request, res: Response): void => {
+const handlerValidateChirp = async (req: Request, res: Response) => {
   type RequestBody = {
     body: string;
   };
@@ -61,21 +61,17 @@ const handlerValidateChirp = (req: Request, res: Response): void => {
   const params: RequestBody = req.body;
 
   if (!params.body) {
-    res.status(400).json({
-      error: "Something went wrong",
-    });
-    return;
+    throw new Error("Invalid body");
   }
 
   if (params.body.length > 140) {
-    res.status(400).json({
-      error: "Chirp is too long",
-    });
-    return;
+    throw new Error("Chirp is too long");
   }
 
   const profaneWords = ["kerfuffle", "sharbert", "fornax"];
+
   const words = params.body.split(" ");
+
   const cleanedWords = words.map((word) => {
     if (profaneWords.includes(word.toLowerCase())) {
       return "****";
@@ -96,7 +92,23 @@ app.use("/app", middlewareMetricsInc, express.static("./src/app"));
 app.get("/api/healthz", handlerReadiness);
 app.get("/admin/metrics", handlerMetrics);
 app.post("/admin/reset", handlerReset);
-app.post("/api/validate_chirp", handlerValidateChirp);
+app.post("/api/validate_chirp", (req, res, next) => {
+  Promise.resolve(handlerValidateChirp(req, res)).catch(next);
+});
+const errorHandler = (
+  err: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  console.log(err);
+
+  res.status(500).json({
+    error: "Something went wrong on our end",
+  });
+};
+
+app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
 });
