@@ -1,12 +1,12 @@
 import { pgTable, timestamp, varchar, uuid, text, } from "drizzle-orm/pg-core";
 export const users = pgTable("users", {
-    id: uuid("id").primaryKey().defaultRandom(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
+    id: uuid("id").defaultRandom().primaryKey(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    email: varchar("email", { length: 256 }).notNull().unique(),
+    hashedPassword: varchar("hashed_password", { length: 256 })
         .notNull()
-        .defaultNow()
-        .$onUpdate(() => new Date()),
-    email: varchar("email", { length: 256 }).unique().notNull(),
+        .default("unset"),
 });
 export const chirps = pgTable("chirps", {
     id: uuid("id").primaryKey().defaultRandom(),

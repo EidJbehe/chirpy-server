@@ -1,184 +1,126 @@
-import express, { Request, Response, NextFunction } from "express";
-import { config } from "./config.js";
-import postgres from "postgres";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
-import { drizzle } from "drizzle-orm/postgres-js";
-import { createUser, deleteAllUsers } from "./db/queries/users.js";
-import { createChirp, getAllChirps,  getChirpById } from "./db/queries/chirps.js";
-const migrationClient = postgres(config.db.url, { max: 1 });
-await migrate(drizzle(migrationClient), config.db.migrationConfig);
+import express from "express";
+import { hashPassword, checkPasswordHash } from "./auth.js";
+import { createUser, getUserByEmail,deleteAllUsers } from "./db/queries/users.js";
+import {
+  createChirp,
+  getAllChirps,
+  getChirpById,
+} from "./db/queries/chirps.js";
 
 const app = express();
 const PORT = 8080;
 
+let fileserverHits = 0;
+
 app.use(express.json());
 
-/*
-========================
-Custom Errors
-========================
-*/
-
-class BadRequestError extends Error {
-  constructor(message: string) {
-    super(message);
+app.post("/admin/reset", async (_req, res, next) => {
+  try {
+    fileserverHits = 0;
+    await deleteAllUsers();
+    res.status(200).send("OK");
+  } catch (err) {
+    next(err);
   }
-}
-
-class UnauthorizedError extends Error {
-  constructor(message: string) {
-    super(message);
-  }
-}
-
-class ForbiddenError extends Error {
-  constructor(message: string) {
-    super(message);
-  }
-}
-
-class NotFoundError extends Error {
-  constructor(message: string) {
-    super(message);
-  }
-}
-
-/*
-========================
-Metrics Middleware
-========================
-*/
-
-app.use("/app", (req, res, next) => {
-  config.api.fileserverHits++;
-  next();
 });
-
-/*
-========================
-Metrics Endpoint
-========================
-*/
-
-app.get("/admin/metrics", (req, res) => {
-  res.set("Content-Type", "text/html");
-  res.status(200).send(`
+app.get("/admin/metrics", (_req, res) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`
     <html>
       <body>
         <h1>Welcome, Chirpy Admin</h1>
-        <p>Chirpy has been visited ${config.api.fileserverHits} times!</p>
+        <p>Chirpy has been visited ${fileserverHits} times!</p>
       </body>
     </html>
   `);
 });
 
-/*
-========================
-Reset Endpoint
-========================
-*/
-
-app.post("/admin/reset", async (req, res) => {
-  if (config.api.platform !== "dev") {
-    res.sendStatus(403);
-    return;
-  }
-
-  config.api.fileserverHits = 0;
-  await deleteAllUsers();
-
-  res.sendStatus(200);
-});
-
-/*
-========================
-Create User Endpoint
-========================
-*/
-
-app.post("/api/users", async (req, res) => {
-  type parameters = {
-    email: string;
-  };
-
-  const params: parameters = req.body;
-
-  const user = await createUser({
-    email: params.email,
-  });
-
-  res.status(201).json(user);
-});
-
-/*
-========================
-Error Handler
-========================
-*/
-
-function errorHandler(
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  if (err instanceof BadRequestError) {
-    res.status(400).send(err.message);
-    return;
-  }
-
-  if (err instanceof UnauthorizedError) {
-    res.status(401).send(err.message);
-    return;
-  }
-
-  if (err instanceof ForbiddenError) {
-    res.status(403).send(err.message);
-    return;
-  }
-
-  if (err instanceof NotFoundError) {
-    res.status(404).send(err.message);
-    return;
-  }
-
-  console.error(err);
-  res.status(500).send("Internal Server Error");
-}
-app.get("/api/chirps/:chirpId", async (req, res, next) => {
+app.post("/api/users", async (req, res, next) => {
   try {
-    const chirpId = req.params.chirpId;
-    const chirp = await getChirpById(chirpId);
+    const { email, password } = req.body;
 
-    if (!chirp) {
-      res.sendStatus(404);
-      return;
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "Email and password are required",
+      });
     }
 
-    res.status(200).json(chirp);
+    const hashedPassword = await hashPassword(password);
+    const user = await createUser(email, hashedPassword);
+
+    return res.status(201).json({
+      id: user.id,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      email: user.email,
+    });
   } catch (err) {
     next(err);
   }
 });
-app.get("/api/chirps", async (req, res, next) => {
+
+app.post("/api/login", async (req, res) => {
   try {
-    const chirps = await getAllChirps();
-    res.status(200).json(chirps);
-  } catch (err) {
-    next(err);
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "email and password are required",
+      });
+    }
+
+    const user = await getUserByEmail(email);
+
+    if (!user) {
+      return res.status(401).json({
+        error: "incorrect email or password",
+      });
+    }
+
+    const validPassword = await checkPasswordHash(
+      password,
+      user.hashedPassword,
+    );
+
+    if (!validPassword) {
+      return res.status(401).json({
+        error: "incorrect email or password",
+      });
+    }
+
+    return res.status(200).json({
+      id: user.id,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      email: user.email,
+    });
+  } catch {
+    return res.status(401).json({
+      error: "incorrect email or password",
+    });
   }
 });
+
 app.post("/api/chirps", async (req, res, next) => {
   try {
-    type parameters = {
-      body: string;
-      userId: string;
-    };
+    const params = req.body;
 
-    const params: parameters = req.body;
+    if (!params.body) {
+      return res.status(400).json({
+        error: "Chirp body is required",
+      });
+    }
+
+    if (!params.userId) {
+      return res.status(400).json({
+        error: "User ID is required",
+      });
+    }
 
     if (params.body.length > 140) {
-      throw new BadRequestError("Chirp is too long");
+      return res.status(400).json({
+        error: "Chirp is too long",
+      });
     }
 
     const badWords = ["kerfuffle", "sharbert", "fornax"];
@@ -194,18 +136,37 @@ app.post("/api/chirps", async (req, res, next) => {
       userId: params.userId,
     });
 
-    res.status(201).json(chirp);
+    return res.status(201).json(chirp);
   } catch (err) {
     next(err);
   }
 });
-app.use(errorHandler);
 
-/*
-========================
-Start Server
-========================
-*/
+app.get("/api/chirps", async (_req, res, next) => {
+  try {
+    const chirps = await getAllChirps();
+    return res.status(200).json(chirps);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get("/api/chirps/:chirpId", async (req, res, next) => {
+  try {
+    const { chirpId } = req.params;
+    const chirp = await getChirpById(chirpId);
+
+    if (!chirp) {
+      return res.status(404).json({
+        error: "chirp not found",
+      });
+    }
+
+    return res.status(200).json(chirp);
+  } catch (err) {
+    next(err);
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
