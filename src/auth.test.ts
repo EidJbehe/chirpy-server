@@ -4,6 +4,7 @@ import {
   checkPasswordHash,
   makeJWT,
   validateJWT,
+  getBearerToken
 } from "./auth";
 
 describe("Password Hashing", () => {
@@ -54,5 +55,30 @@ describe("JWT", () => {
     expect(() => {
       validateJWT(token, secret);
     }).toThrow();
+  });
+});
+describe("getBearerToken", () => {
+  it("should extract token from Bearer header", () => {
+    const req = {
+      get(headerName: string) {
+        if (headerName === "Authorization") {
+          return "Bearer my-test-token";
+        }
+        return undefined;
+      },
+    } as any;
+
+    const token = getBearerToken(req);
+    expect(token).toBe("my-test-token");
+  });
+
+  it("should throw when authorization header is missing", () => {
+    const req = {
+      get() {
+        return undefined;
+      },
+    } as any;
+
+    expect(() => getBearerToken(req)).toThrow();
   });
 });

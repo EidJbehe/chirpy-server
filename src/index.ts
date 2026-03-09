@@ -1,12 +1,18 @@
 import express from "express";
-import { hashPassword, checkPasswordHash } from "./auth.js";
 import { createUser, getUserByEmail,deleteAllUsers } from "./db/queries/users.js";
 import {
   createChirp,
   getAllChirps,
   getChirpById,
 } from "./db/queries/chirps.js";
-
+import {
+  hashPassword,
+  checkPasswordHash,
+  makeJWT,
+  validateJWT,
+  getBearerToken,
+} from "./auth.js";
+import { config } from "./config.js";
 const app = express();
 const PORT = 8080;
 
@@ -61,7 +67,7 @@ app.post("/api/users", async (req, res, next) => {
 
 app.post("/api/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, expiresInSeconds } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -88,11 +94,24 @@ app.post("/api/login", async (req, res) => {
       });
     }
 
+    let expiresIn = 3600;
+
+    if (
+      typeof expiresInSeconds === "number" &&
+      expiresInSeconds > 0 &&
+      expiresInSeconds < 3600
+    ) {
+      expiresIn = expiresInSeconds;
+    }
+
+    const token = makeJWT(user.id, expiresIn, config.api.jwtSecret);
+
     return res.status(200).json({
       id: user.id,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       email: user.email,
+      token,
     });
   } catch {
     return res.status(401).json({
@@ -103,17 +122,14 @@ app.post("/api/login", async (req, res) => {
 
 app.post("/api/chirps", async (req, res, next) => {
   try {
+    const token = getBearerToken(req);
+    const userId = validateJWT(token, config.api.jwtSecret);
+
     const params = req.body;
 
     if (!params.body) {
       return res.status(400).json({
         error: "Chirp body is required",
-      });
-    }
-
-    if (!params.userId) {
-      return res.status(400).json({
-        error: "User ID is required",
       });
     }
 
@@ -133,7 +149,7 @@ app.post("/api/chirps", async (req, res, next) => {
 
     const chirp = await createChirp({
       body: cleanedBody,
-      userId: params.userId,
+      userId,
     });
 
     return res.status(201).json(chirp);
@@ -141,7 +157,6 @@ app.post("/api/chirps", async (req, res, next) => {
     next(err);
   }
 });
-
 app.get("/api/chirps", async (_req, res, next) => {
   try {
     const chirps = await getAllChirps();

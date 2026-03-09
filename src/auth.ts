@@ -1,12 +1,7 @@
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 import type { JwtPayload } from "jsonwebtoken";
-
-/*
-========================
-Password Hashing
-========================
-*/
+import type { Request } from "express";
 
 export async function hashPassword(password: string): Promise<string> {
   return await argon2.hash(password);
@@ -18,12 +13,6 @@ export async function checkPasswordHash(
 ): Promise<boolean> {
   return await argon2.verify(hash, password);
 }
-
-/*
-========================
-JWT
-========================
-*/
 
 type Payload = Pick<JwtPayload, "iss" | "sub" | "iat" | "exp">;
 
@@ -37,7 +26,7 @@ export function makeJWT(
   const payload: Payload = {
     iss: "chirpy",
     sub: userID,
-    iat: iat,
+    iat,
     exp: iat + expiresIn,
   };
 
@@ -48,12 +37,28 @@ export function validateJWT(tokenString: string, secret: string): string {
   try {
     const decoded = jwt.verify(tokenString, secret) as JwtPayload;
 
-    if (!decoded.sub) {
+    if (!decoded.sub || typeof decoded.sub !== "string") {
       throw new Error("Invalid token");
     }
 
-    return decoded.sub as string;
+    return decoded.sub;
   } catch {
     throw new Error("Invalid token");
   }
+}
+
+export function getBearerToken(req: Request): string {
+  const authHeader = req.get("Authorization");
+
+  if (!authHeader) {
+    throw new Error("Missing authorization header");
+  }
+
+  const parts = authHeader.split(" ");
+
+  if (parts.length !== 2 || parts[0] !== "Bearer") {
+    throw new Error("Invalid authorization header");
+  }
+
+  return parts[1];
 }
