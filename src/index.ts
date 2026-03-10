@@ -176,12 +176,19 @@ app.get("/api/chirps", async (req, res, next) => {
   try {
     let authorId = "";
     const authorIdQuery = req.query.authorId;
-
     if (typeof authorIdQuery === "string") {
       authorId = authorIdQuery;
     }
 
     const allChirps = await getAllChirps(authorId || undefined);
+
+    const sortQuery = req.query.sort;
+    if (sortQuery === "desc") {
+      allChirps.sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+
     return res.status(200).json(allChirps);
   } catch (err) {
     next(err);
