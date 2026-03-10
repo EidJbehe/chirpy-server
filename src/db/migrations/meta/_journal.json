@@ -22,6 +22,13 @@
       "when": 1773095781931,
       "tag": "0002_dry_devos",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773103095131,
+      "tag": "0003_soft_wallop",
+      "breakpoints": true
     }
   ]
 }

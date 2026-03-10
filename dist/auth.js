@@ -1,5 +1,6 @@
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 export async function hashPassword(password) {
     return await argon2.hash(password);
 }
@@ -38,4 +39,7 @@ export function getBearerToken(req) {
         throw new Error("Invalid authorization header");
     }
     return parts[1];
+}
+export function makeRefreshToken() {
+    return crypto.randomBytes(32).toString("hex");
 }
