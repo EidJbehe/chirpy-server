@@ -65,3 +65,18 @@ export function getBearerToken(req: Request): string {
 export function makeRefreshToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
+export function getAPIKey(req: Request): string {
+  const authHeader = req.get("Authorization");
+
+  if (!authHeader) {
+    throw new Error("Missing authorization header");
+  }
+
+  const parts = authHeader.split(" ");
+
+  if (parts.length !== 2 || parts[0] !== "ApiKey") {
+    throw new Error("Invalid authorization header");
+  }
+
+  return parts[1];
+}

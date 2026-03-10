@@ -19,6 +19,7 @@ import {
   getBearerToken,
   hashPassword,
   checkPasswordHash,
+  getAPIKey,
 } from "./auth.js";
 import {
   createRefreshToken,
@@ -109,7 +110,7 @@ app.post("/api/login", async (req, res) => {
       });
     }
 
-    const accessToken = makeJWT(user.id, 3600, config.api.jwtSecret);
+    const accessToken = makeJWT(user.id, 3600,config.api.jwtSecret);
     const refreshToken = makeRefreshToken();
     const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
 
@@ -228,7 +229,7 @@ app.delete("/api/chirps/:chirpId", async (req, res) => {
 app.put("/api/users", async (req, res) => {
   try {
     const token = getBearerToken(req);
-    const userId = validateJWT(token, config.api.jwtSecret);
+    const userId = validateJWT(token,config.api.jwtSecret);
 
     const { email, password } = req.body;
 
@@ -256,6 +257,12 @@ app.put("/api/users", async (req, res) => {
 });
 app.post("/api/polka/webhooks", async (req, res) => {
   try {
+    const apiKey = getAPIKey(req);
+
+    if (apiKey !== config.api.polkaKey) {
+      return res.status(401).json({ error: "unauthorized" });
+    }
+
     const { event, data } = req.body;
 
     if (event !== "user.upgraded") {
@@ -270,7 +277,7 @@ app.post("/api/polka/webhooks", async (req, res) => {
 
     return res.status(204).send();
   } catch {
-    return res.status(404).json({ error: "user not found" });
+    return res.status(401).json({ error: "unauthorized" }); 
   }
 });
 app.post("/api/refresh", async (req, res) => {

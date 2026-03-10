@@ -1,7 +1,7 @@
 import express from "express";
 import { createUser, getUserByEmail, deleteAllUsers, updateUser, upgradeUserToChirpyRed, } from "./db/queries/users.js";
 import { createChirp, getAllChirps, getChirpById, deleteChirp } from "./db/queries/chirps.js";
-import { makeRefreshToken, makeJWT, validateJWT, getBearerToken, hashPassword, checkPasswordHash, } from "./auth.js";
+import { makeRefreshToken, makeJWT, validateJWT, getBearerToken, hashPassword, checkPasswordHash, getAPIKey, } from "./auth.js";
 import { createRefreshToken, getUserFromRefreshToken, revokeRefreshToken, } from "./db/queries/refreshTokens.js";
 import { config } from "./config.js";
 const app = express();
@@ -200,6 +200,10 @@ app.put("/api/users", async (req, res) => {
 });
 app.post("/api/polka/webhooks", async (req, res) => {
     try {
+        const apiKey = getAPIKey(req);
+        if (apiKey !== config.api.polkaKey) {
+            return res.status(401).json({ error: "unauthorized" });
+        }
         const { event, data } = req.body;
         if (event !== "user.upgraded") {
             return res.status(204).send();
@@ -211,7 +215,7 @@ app.post("/api/polka/webhooks", async (req, res) => {
         return res.status(204).send();
     }
     catch {
-        return res.status(404).json({ error: "user not found" });
+        return res.status(401).json({ error: "unauthorized" });
     }
 });
 app.post("/api/refresh", async (req, res) => {
