@@ -172,15 +172,21 @@ app.post("/api/chirps", async (req, res) => {
   }
 });
 
-app.get("/api/chirps", async (_req, res, next) => {
+app.get("/api/chirps", async (req, res, next) => {
   try {
-    const chirps = await getAllChirps();
-    return res.status(200).json(chirps);
+    let authorId = "";
+    const authorIdQuery = req.query.authorId;
+
+    if (typeof authorIdQuery === "string") {
+      authorId = authorIdQuery;
+    }
+
+    const allChirps = await getAllChirps(authorId || undefined);
+    return res.status(200).json(allChirps);
   } catch (err) {
     next(err);
   }
 });
-
 app.get("/api/chirps/:chirpId", async (req, res, next) => {
   try {
     const { chirpId } = req.params;
