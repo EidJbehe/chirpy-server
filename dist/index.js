@@ -1,6 +1,6 @@
 import express from "express";
 import { createUser, getUserByEmail, deleteAllUsers, updateUser } from "./db/queries/users.js";
-import { createChirp, getAllChirps, getChirpById, } from "./db/queries/chirps.js";
+import { createChirp, getAllChirps, getChirpById, deleteChirp } from "./db/queries/chirps.js";
 import { makeRefreshToken, makeJWT, validateJWT, getBearerToken, hashPassword, checkPasswordHash, } from "./auth.js";
 import { createRefreshToken, getUserFromRefreshToken, revokeRefreshToken, } from "./db/queries/refreshTokens.js";
 import { config } from "./config.js";
@@ -143,6 +143,31 @@ app.get("/api/chirps/:chirpId", async (req, res, next) => {
     }
     catch (err) {
         next(err);
+    }
+});
+app.delete("/api/chirps/:chirpId", async (req, res) => {
+    try {
+        const token = getBearerToken(req);
+        const userId = validateJWT(token, config.api.jwtSecret);
+        const { chirpId } = req.params;
+        const chirp = await getChirpById(chirpId);
+        if (!chirp) {
+            return res.status(404).json({
+                error: "chirp not found",
+            });
+        }
+        if (chirp.userId !== userId) {
+            return res.status(403).json({
+                error: "forbidden",
+            });
+        }
+        await deleteChirp(chirpId);
+        return res.status(204).send();
+    }
+    catch {
+        return res.status(401).json({
+            error: "unauthorized",
+        });
     }
 });
 app.put("/api/users", async (req, res) => {
