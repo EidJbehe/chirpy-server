@@ -3,7 +3,8 @@ import {
   createUser,
   getUserByEmail,
   deleteAllUsers,
-updateUser
+updateUser,
+  upgradeUserToChirpyRed,
 } from "./db/queries/users.js";
 import {
   createChirp,
@@ -72,6 +73,7 @@ app.post("/api/users", async (req, res, next) => {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       email: user.email,
+ isChirpyRed: user.isChirpyRed,
     });
   } catch (err) {
     next(err);
@@ -120,6 +122,7 @@ app.post("/api/login", async (req, res) => {
       email: user.email,
       token: accessToken,
       refreshToken,
+ isChirpyRed: user.isChirpyRed,
     });
   } catch {
     return res.status(401).json({
@@ -243,11 +246,31 @@ app.put("/api/users", async (req, res) => {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       email: user.email,
+ isChirpyRed: user.isChirpyRed,
     });
   } catch {
     return res.status(401).json({
       error: "unauthorized",
     });
+  }
+});
+app.post("/api/polka/webhooks", async (req, res) => {
+  try {
+    const { event, data } = req.body;
+
+    if (event !== "user.upgraded") {
+      return res.status(204).send();
+    }
+
+    const user = await upgradeUserToChirpyRed(data.userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "user not found" });
+    }
+
+    return res.status(204).send();
+  } catch {
+    return res.status(404).json({ error: "user not found" });
   }
 });
 app.post("/api/refresh", async (req, res) => {

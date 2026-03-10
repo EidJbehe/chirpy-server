@@ -29,6 +29,13 @@
       "when": 1773103095131,
       "tag": "0003_soft_wallop",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1773106567668,
+      "tag": "0004_faulty_vector",
+      "breakpoints": true
     }
   ]
 }
