@@ -21,3 +21,15 @@ export async function getUserByEmail(email) {
 export async function deleteAllUsers() {
     await db.delete(users);
 }
+export async function updateUser(id, email, hashedPassword) {
+    const [user] = await db
+        .update(users)
+        .set({
+        email,
+        hashedPassword,
+        updatedAt: new Date(),
+    })
+        .where(eq(users.id, id))
+        .returning();
+    return user;
+}

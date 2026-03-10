@@ -3,11 +3,13 @@ import {
   createUser,
   getUserByEmail,
   deleteAllUsers,
+updateUser
 } from "./db/queries/users.js";
 import {
   createChirp,
   getAllChirps,
   getChirpById,
+ 
 } from "./db/queries/chirps.js";
 import {
   makeRefreshToken,
@@ -191,7 +193,34 @@ app.get("/api/chirps/:chirpId", async (req, res, next) => {
     next(err);
   }
 });
+app.put("/api/users", async (req, res) => {
+  try {
+    const token = getBearerToken(req);
+    const userId = validateJWT(token, config.api.jwtSecret);
 
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "email and password are required",
+      });
+    }
+
+    const hashedPassword = await hashPassword(password);
+    const user = await updateUser(userId, email, hashedPassword);
+
+    return res.status(200).json({
+      id: user.id,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      email: user.email,
+    });
+  } catch {
+    return res.status(401).json({
+      error: "unauthorized",
+    });
+  }
+});
 app.post("/api/refresh", async (req, res) => {
   try {
     const refreshToken = getBearerToken(req);
